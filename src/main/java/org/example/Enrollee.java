@@ -17,6 +17,15 @@ public class Enrollee {
         this.version = version;
         this.insuranceCompany = insuranceCompany;
     }
+
+    public Enrollee(Enrollee enrollee) {
+        this.userId = enrollee.getUserId();
+        this.firstName = enrollee.getFirstName();
+        this.lastName = enrollee.getLastName();
+        this.version = enrollee.getVersion();
+        this.insuranceCompany = enrollee.getInsuranceCompany();
+    }
+
     public String getUserId() {
         return userId;
     }

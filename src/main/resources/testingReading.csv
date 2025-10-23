@@ -1,14 +1,50 @@
-User Id,Name,Version,Insurance Company
-A102,John Smith,3,United Health
-A102,John Smith,2,United Health
-A103,Emily Johnson,1,United Health
-A104,Michael Brown,5,Blue Shield
-A105,Olivia Davis,2,Blue Shield
-A106,William Wilson,1,Kaiser Permanente
-A107,Ava Martinez,4,Kaiser Permanente
-A107,Ava Martinez,5,Kaiser Permanente
-A108,James Anderson,1,Aetna
-A109,Sophia Thomas,2,Aetna
-A110,Isabella Lee,1,Blue Shield
-A111,Liam Harris,3,United Health
-A112,Mason Clark,2,Kaiser Permanente
+User Id,Full Name,Version,Insurance Company
+U1001,John Smith,1,Acme Insurance
+U1002,Jane Doe,2,Acme Insurance
+U1003,Michael Brown,1,Acme Insurance
+U1001,John Smith,3,Acme Insurance
+U1004,Emily Davis,2,Sunrise Health
+U1002,Jane Doe,1,Sunrise Health
+U1005,William Johnson,3,Sunrise Health
+U1006,Sarah Wilson,1,HealthFirst
+U1007,David Miller,2,HealthFirst
+U1008,Olivia Garcia,1,HealthFirst
+U1007,David Miller,5,HealthFirst
+U1009,James Martinez,1,WellCare
+U1010,Linda Rodriguez,2,WellCare
+U1011,Robert Hernandez,3,WellCare
+U1011,Robert Hernandez,1,WellCare
+U1012,Patricia Lopez,1,Blue Shield
+U1013,Christopher Gonzalez,4,Blue Shield
+U1014,Jessica Perez,3,Blue Shield
+U1013,Christopher Gonzalez,2,Blue Shield
+U1015,Thomas Anderson,1,Acme Insurance
+U1016,Nancy Thompson,2,Sunrise Health
+U1016,Nancy Thompson,5,Sunrise Health
+U1017,Daniel White,1,Sunrise Health
+U1018,Karen Lewis,4,HealthFirst
+U1018,Karen Lewis,3,HealthFirst
+U1019,Mark Hall,2,Blue Shield
+U1020,Susan Allen,3,Blue Shield
+U1020,Susan Allen,1,Blue Shield
+U1021,Betty Young,2,WellCare
+U1021,Betty Young,5,WellCare
+U1022,George King,2,Acme Insurance
+U1023,Donna Wright,3,Sunrise Health
+U1024,Steven Scott,2,HealthFirst
+U1025,Michelle Green,2,HealthFirst
+U1026,Barbara Adams,4,WellCare
+U1027,Matthew Baker,1,Blue Shield
+U1028,Anthony Nelson,4,Acme Insurance
+U1028,Anthony Nelson,2,Acme Insurance
+U1029,Deborah Carter,1,Sunrise Health
+U1030,Jason Mitchell,1,WellCare
+U1031,Rebecca Perez,2,Blue Shield
+U1032,Charles Turner,4,Blue Shield
+U1033,Larry Phillips,1,HealthFirst
+U1034,Jennifer Campbell,5,Acme Insurance
+U1034,Jennifer Campbell,3,Acme Insurance
+U1035,Elizabeth Parker,2,Sunrise Health
+U1035,Elizabeth Parker,4,Sunrise Health
+U1036,Kevin Evans,2,WellCare
+U1036,Kevin Evans,3,WellCare
