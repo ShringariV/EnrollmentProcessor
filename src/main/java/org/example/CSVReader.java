@@ -5,9 +5,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Logger;
 
 public class CSVReader {
-
+    private static final Logger logger = Logger.getLogger(CSVReader.class.getName());
     /**
      * Reads enrollee data from a CSV file and organizes it into a map where each
      * insurance company is mapped to its corresponding enrollees. Each enrollee is uniquely
@@ -19,12 +20,12 @@ public class CSVReader {
      *                 UserId, FullName, Version, InsuranceCompany
      * @return a map containing insurance companies as keys, where each key maps
      *         to another map. This inner map has user IDs as keys and the corresponding
-     *         {@link Enrollee} objects as values.
+     *         {@link Enrolled} objects as values.
      */
-    public static Map<String, Map<String, Enrollee>> readEnrollees(String filePath) {
+    public static Map<String, Map<String, Enrolled>> readEnrollees(String filePath) throws IOException {
         // Key: Insurance company name
         // Value: Another map where the key is the user ID and the value is the Enrollee object.
-        Map<String, Map<String, Enrollee>> companyMap = new HashMap<>();
+        Map<String, Map<String, Enrolled>> companyMap = new HashMap<>();
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
             System.out.println("Reading file: " + filePath);
             br.readLine();
@@ -34,43 +35,46 @@ public class CSVReader {
                 String[] values = line.split(",");
                 if (values.length < 4) continue;
 
-                Enrollee enrollee = getEnrollee(values);
-                String company = enrollee.getInsuranceCompany();
-                String userId = enrollee.getUserId();
+                Enrolled enrolled = getEnrollee(values);
+                String company = enrolled.insuranceCompany();
+                String userId = enrolled.userId();
 
                 // Get the map for this company
-                Map<String, Enrollee> enrolleesByCompany =
+                Map<String, Enrolled> enrolleesByCompany =
                         companyMap.computeIfAbsent(company, k -> new HashMap<>());
 
                 // Check if an existing enrollee with the same userId exists
-                Enrollee existing = enrolleesByCompany.get(userId);
+                Enrolled existing = enrolleesByCompany.get(userId);
 
                 // Keep the enrollee with the highest version number
-                if (existing == null || enrollee.getVersion() > existing.getVersion()) {
-                    enrolleesByCompany.put(userId, enrollee);
+                if (existing == null || enrolled.version() > existing.version()) {
+                    enrolleesByCompany.put(userId, enrolled);
                 }
             }
         } catch (IOException e) {
-            System.err.println("Error reading file: " + filePath);
-            e.printStackTrace();
+            logger.severe("Error reading file: " + filePath + ": " + e.getMessage());
+            throw new IOException("Error reading file: " + filePath, e);
         }
 
         return companyMap;
     }
 
     /**
-     * Parses a line's values into an {@link Enrollee} object.
+     * Parses a line's values into an {@link Enrolled} object.
      * <p>
      * Splits the full name into first and last names if applicable.
      * If only one name is provided, it is stored as the first name.
      *
      * @param values an array containing CSV fields in the order:
      *               [UserId, FullName, Version, InsuranceCompany]
-     * @return a constructed {@link Enrollee} object.
+     * @return a constructed {@link Enrolled} object.
      */
-    private static Enrollee getEnrollee(String[] values) {
+    private static Enrolled getEnrollee(String[] values) {
         String userId = values[0].trim();
         String fullName = values[1].trim();
+        // remove leading/trailing whitespace
+        // collapse all internal whitespace
+        fullName = fullName.trim().replaceAll("\\s+", " ");
         int version = Integer.parseInt(values[2].trim());
         String insuranceCompany = values[3].trim();
 
@@ -85,6 +89,6 @@ public class CSVReader {
             firstName = nameParts[0];
         }
 
-        return new Enrollee(userId, firstName, lastName, version, insuranceCompany);
+        return new Enrolled(userId, firstName, lastName, version, insuranceCompany);
     }
 }
