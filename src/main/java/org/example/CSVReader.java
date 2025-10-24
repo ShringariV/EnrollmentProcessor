@@ -3,9 +3,14 @@ package org.example;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class CSVReader {
     private static final Logger logger = Logger.getLogger(CSVReader.class.getName());
@@ -23,41 +28,68 @@ public class CSVReader {
      *         {@link Enrolled} objects as values.
      */
     public static Map<String, Map<String, Enrolled>> readEnrollees(String filePath) throws IOException {
-        // Key: Insurance company name
-        // Value: Another map where the key is the user ID and the value is the Enrollee object.
-        Map<String, Map<String, Enrolled>> companyMap = new HashMap<>();
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-            System.out.println("Reading file: " + filePath);
-            br.readLine();
-            String line;
-
-            while ((line = br.readLine()) != null) {
-                String[] values = line.split(",");
-                if (values.length < 4) continue;
-
-                Enrolled enrolled = getEnrollee(values);
-                String company = enrolled.insuranceCompany();
-                String userId = enrolled.userId();
-
-                // Get the map for this company
-                Map<String, Enrolled> enrolleesByCompany =
-                        companyMap.computeIfAbsent(company, k -> new HashMap<>());
-
-                // Check if an existing enrollee with the same userId exists
-                Enrolled existing = enrolleesByCompany.get(userId);
-
-                // Keep the enrollee with the highest version number
-                if (existing == null || enrolled.version() > existing.version()) {
-                    enrolleesByCompany.put(userId, enrolled);
-                }
-            }
+        // Create stream
+        try (Stream<String> lines = Files.lines(Paths.get(filePath))) {
+            return lines
+                    // skip header
+                    .skip(1)
+                    // split by comma
+                    .map(line -> line.split(","))
+                    // filter malformed
+                    .filter(values -> values.length >= 4)
+                    // convert each arr to enrolled obj
+                    .map(CSVReader::getEnrollee)
+                    // group by insurance company
+                    .collect(Collectors.groupingBy(
+                            Enrolled::insuranceCompany,
+                            // create inner map
+                            Collectors.toMap(
+                                    Enrolled::userId,
+                                    Function.identity(),
+                                    (e1, e2) -> e1.version() > e2.version() ? e1 : e2
+                            )
+                    // return collected result
+                    ));
         } catch (IOException e) {
             logger.severe("Error reading file: " + filePath + ": " + e.getMessage());
             throw new IOException("Error reading file: " + filePath, e);
         }
-
-        return companyMap;
     }
+//        // Key: Insurance company name
+//        // Value: Another map where the key is the user ID and the value is the Enrollee object.
+//        Map<String, Map<String, Enrolled>> companyMap = new HashMap<>();
+//        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+//            System.out.println("Reading file: " + filePath);
+//            br.readLine();
+//            String line;
+//
+//            while ((line = br.readLine()) != null) {
+//                String[] values = line.split(",");
+//                if (values.length < 4) continue;
+//
+//                Enrolled enrolled = getEnrollee(values);
+//                String company = enrolled.insuranceCompany();
+//                String userId = enrolled.userId();
+//
+//                // Get the map for this company
+//                Map<String, Enrolled> enrolleesByCompany =
+//                        companyMap.computeIfAbsent(company, k -> new HashMap<>());
+//
+//                // Check if an existing enrollee with the same userId exists
+//                Enrolled existing = enrolleesByCompany.get(userId);
+//
+//                // Keep the enrollee with the highest version number
+//                if (existing == null || enrolled.version() > existing.version()) {
+//                    enrolleesByCompany.put(userId, enrolled);
+//                }
+//            }
+//        } catch (IOException e) {
+//            logger.severe("Error reading file: " + filePath + ": " + e.getMessage());
+//            throw new IOException("Error reading file: " + filePath, e);
+//        }
+//
+//        return companyMap;
+
 
     /**
      * Parses a line's values into an {@link Enrolled} object.
