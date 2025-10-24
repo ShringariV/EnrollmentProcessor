@@ -5,7 +5,9 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.logging.Logger;
@@ -28,28 +30,30 @@ public class CSVReader {
      *         {@link Enrolled} objects as values.
      */
     public static Map<String, Map<String, Enrolled>> readEnrollees(String filePath) throws IOException {
-        // Create stream
+        // open file as stream
         try (Stream<String> lines = Files.lines(Paths.get(filePath))) {
-            return lines
+            return
                     // skip header
-                    .skip(1)
-                    // split by comma
-                    .map(line -> line.split(","))
-                    // filter malformed
-                    .filter(values -> values.length >= 4)
-                    // convert each arr to enrolled obj
-                    .map(CSVReader::getEnrollee)
-                    // group by insurance company
-                    .collect(Collectors.groupingBy(
-                            Enrolled::insuranceCompany,
-                            // create inner map
-                            Collectors.toMap(
-                                    Enrolled::userId,
-                                    Function.identity(),
-                                    (e1, e2) -> e1.version() > e2.version() ? e1 : e2
-                            )
-                    // return collected result
-                    ));
+                    lines.skip(1)
+                            // split each line
+                            .map(line -> line.split(","))
+                            // skip lines without all 4 fields
+                            .filter(values -> values.length >= 4)
+                            // Convert each line into enrolled record
+                            .map(CSVReader::getEnrollee)
+                            // group by insurance company
+                            .collect(Collectors.groupingBy(
+                                    Enrolled::insuranceCompany,
+                                    // transform inner list into a map
+                                    // key = userID
+                                    // value = enroll
+                                    // merge => if there are duplicates with the same userID, keep the highest version number
+                                    Collectors.toMap(
+                                            Enrolled::userId,
+                                            Function.identity(),
+                                            (e1, e2) -> e1.version() >= e2.version() ? e1 : e2
+                                    )
+                            ));
         } catch (IOException e) {
             logger.severe("Error reading file: " + filePath + ": " + e.getMessage());
             throw new IOException("Error reading file: " + filePath, e);

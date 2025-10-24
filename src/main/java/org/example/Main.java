@@ -74,7 +74,9 @@ public class Main {
     public static void main(String[] args) throws IOException {
         String filePath = "src/main/resources/testingReading.csv";
         System.out.println("Reading Enrollees");
-        Map<String, Map<String, Enrolled>> companyMap = CSVReader.readEnrollees(filePath);
+        Map<String, Map<String, Enrolled>> companyMap = (CSVReader.readEnrollees(filePath));
+        System.out.println("Sorting Enrollees by Name");
+        companyMap = Sorting.sortByName(companyMap);
         System.out.println("Enrollees by Insurance Company");
         companyMap.forEach((company, enrolleeMap) -> {
             System.out.println("\n" + company + ":");
