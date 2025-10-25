@@ -6,6 +6,9 @@ import java.util.stream.Collectors;
 import java.util.logging.Logger;
 public class Sorting {
     private static final Logger logger = Logger.getLogger(Sorting.class.getName());
+    private Sorting() {
+        throw new IllegalStateException("Utility class");
+    }
     /**
      * Sorts each company's enrollees by last name, then first name (ascending).
      * Returns a new Map with sorted inner maps.
@@ -15,7 +18,7 @@ public class Sorting {
      */
     public static Map<String, Map<String, Enrolled>> sortByName(Map<String, Map<String, Enrolled>> grouped) {
         logger.info("Sorting enrollees by last and first name (ascending)");
-        // Convert outer map entries into a stream for transformation
+        // convert outer map entries into a stream for transformation
         return grouped.entrySet().stream()
                 .collect(Collectors.toMap(
                         // preserve insurance company name
@@ -32,11 +35,13 @@ public class Sorting {
                                 .collect(Collectors.toMap(
                                         Enrolled::userId,
                                         Function.identity(),
-                                        // merge rule just in case
+                                        // merge rule just in case there are keys with the same user id
+                                        // No need for deduplication since we already read it
                                         (a, b) -> a,
                                         LinkedHashMap::new
                                 )),
-                        // merge function
+                        // merge rule just in case there are keys with the same user id
+                        // No need for deduplication since we already read it
                         (a, b) -> a,
                         LinkedHashMap::new
                 ));

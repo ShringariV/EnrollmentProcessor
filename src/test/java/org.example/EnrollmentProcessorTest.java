@@ -139,4 +139,28 @@ public class EnrollmentProcessorTest {
                 "Expected IOException indicating missing file"
         );
     }
+    @Test
+    public void testDuplicateAcrossDifferentCompanies() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,John Doe,1,Acme Insurance
+            1,John Doe,2,Zenith Health
+            """;
+        Files.writeString(tempCsv, csv);
+        var map = CSVReader.readEnrollees(tempCsv.toString());
+        assertEquals(2, map.size());
+        assertEquals(1, map.get("Acme Insurance").size());
+        assertEquals(1, map.get("Zenith Health").size());
+    }
+
+    @Test
+    public void testNonNumericVersionDoesNotCrash() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,John Doe,ABC,Acme Insurance
+            """;
+        Files.writeString(tempCsv, csv);
+        var map = CSVReader.readEnrollees(tempCsv.toString());
+        assertTrue(map.isEmpty());
+    }
 }

@@ -1,14 +1,13 @@
 package org.example;
 
+import org.slf4j.LoggerFactory;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -16,6 +15,11 @@ import java.util.stream.Stream;
 
 public class CSVReader {
     private static final Logger logger = Logger.getLogger(CSVReader.class.getName());
+    private static final org.slf4j.Logger log = LoggerFactory.getLogger(CSVReader.class);
+
+    private CSVReader() {
+        throw new IllegalStateException("Utility class");
+    }
     /**
      * Reads enrollee data from a CSV file and organizes it into a map where each
      * insurance company is mapped to its corresponding enrollees. Each enrollee is uniquely
@@ -41,6 +45,8 @@ public class CSVReader {
                             .filter(values -> values.length >= 4)
                             // Convert each line into enrolled record
                             .map(CSVReader::getEnrollee)
+                            // skip invalid rows
+                            .filter(Objects::nonNull)
                             // group by insurance company
                             .collect(Collectors.groupingBy(
                                     Enrolled::insuranceCompany,
@@ -106,25 +112,39 @@ public class CSVReader {
      * @return a constructed {@link Enrolled} object.
      */
     private static Enrolled getEnrollee(String[] values) {
-        String userId = values[0].trim();
-        String fullName = values[1].trim();
-        // remove leading/trailing whitespace
-        // collapse all internal whitespace
-        fullName = fullName.trim().replaceAll("\\s+", " ");
-        int version = Integer.parseInt(values[2].trim());
-        String insuranceCompany = values[3].trim();
+        try {
+            String userId = values[0].trim();
+            String fullName = values[1].trim();
+            // remove leading/trailing whitespace
+            // collapse all internal whitespace
+            fullName = fullName.trim().replaceAll("\\s+", " ");
+            int version = Integer.parseInt(values[2].trim());
+            String insuranceCompany = values[3].trim();
 
-        String firstName = "";
-        String lastName = "";
-        String[] nameParts = fullName.split(" ");
+            String firstName = "";
+            String lastName = "";
+            String[] nameParts = fullName.split(" ");
 
-        if (nameParts.length >= 2) {
-            firstName = nameParts[0];
-            lastName = nameParts[1];
-        } else if (nameParts.length == 1) {
-            firstName = nameParts[0];
+            if (nameParts.length >= 2) {
+                firstName = nameParts[0];
+                lastName = nameParts[1];
+            } else if (nameParts.length == 1) {
+                firstName = nameParts[0];
+            }
+
+            return new Enrolled(userId, firstName, lastName, version, insuranceCompany);
+        } catch (NumberFormatException e) {
+            logger.warning(() -> "Skipping row due to invalid version number: " + String.join(",", values) +
+                    " | Error: " + e.getMessage());
+            return null;
+        } catch (ArrayIndexOutOfBoundsException e) {
+          logger.warning(() -> "Skipping row due to invalid number of fields: " + String.join(",", values) +
+                    " | Error: " + e.getMessage());
+        } catch (Exception e) {
+            logger.severe(() -> "Unexpected error parsing row: " + String.join(",", values) +
+                    " | Exception: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            return null;
         }
-
-        return new Enrolled(userId, firstName, lastName, version, insuranceCompany);
+        return null;
     }
 }

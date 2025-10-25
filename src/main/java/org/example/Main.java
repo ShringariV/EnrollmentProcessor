@@ -71,24 +71,32 @@ Space Complexity:
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 public class Main {
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         String filePath = "src/main/resources/testingReading.csv";
-        System.out.println("Reading Enrollees");
-        Map<String, Map<String, Enrolled>> companyMap = (CSVReader.readEnrollees(filePath));
-        System.out.println("Sorting Enrollees by Name");
-        companyMap = Sorting.sortByName(companyMap);
-        System.out.println("Enrollees by Insurance Company");
-        companyMap.forEach((company, enrolleeMap) -> {
-            System.out.println("\n" + company + ":");
-            System.out.println("---------------------------------------------");
 
-            enrolleeMap.forEach((userId, enrolled) -> {
-                System.out.printf("  %-10s | %-10s %-10s | v%-2d%n",
-                        enrolled.userId(),
-                        enrolled.firstName(),
-                        enrolled.lastName(),
-                        enrolled.version());
+        try {
+            System.out.println("Enrollment File Processor");
+
+            Map<String, Map<String, Enrolled>> companyMap = CSVReader.readEnrollees(filePath);
+            System.out.println("Successfully read and grouped enrollees by insurance company.");
+
+            Map<String, Map<String, Enrolled>> sortedMap = Sorting.sortByName(companyMap);
+            System.out.println("Successfully sorted enrollees (last name, first name).");
+
+            CSVWriter.writeByCompany(sortedMap);
+            System.out.println("Successfully wrote sorted CSV files to: src/main/resources/output");
+
+            System.out.println("Enrollees by Insurance Company");
+            sortedMap.forEach((company, enrollees) -> {
+                System.out.println("\n" + company);
+                System.out.println("=".repeat(company.length()));
+                enrollees.forEach((id, e) ->
+                        System.out.printf("  %-10s | %-12s %-12s | v%-2d%n",
+                                e.userId(), e.firstName(), e.lastName(), e.version()));
             });
-        });
+
+        } catch (IOException e) {
+            System.err.println("Error during processing: " + e.getMessage());
+        }
     }
 }
