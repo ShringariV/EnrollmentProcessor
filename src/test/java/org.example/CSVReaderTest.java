@@ -168,4 +168,85 @@ public class CSVReaderTest {
         assertEquals(1, map.get("Acme Insurance").size());
         assertEquals("John", map.get("Acme Insurance").get("1").firstName());
     }
+
+    @Test
+    public void testInvalidVersionNumberTriggersWarning() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,John Doe,abc,Acme Insurance
+            2,Jane Smith,3,Zenith Health
+            """;
+        Files.writeString(tempCsv, csv);
+
+        var map = CSVReader.readEnrollees(tempCsv.toString());
+        // first record skipped, second valid → 1 company total
+        assertEquals(1, map.size());
+        assertTrue(map.containsKey("Zenith Health"));
+    }
+
+    @Test
+    public void testTooFewColumnsTriggersArrayIndexError() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,John Doe,2
+            2,Jane Smith,3,Zenith Health
+            """;
+        Files.writeString(tempCsv, csv);
+
+        var map = CSVReader.readEnrollees(tempCsv.toString());
+        // first line skipped, second valid
+        assertEquals(1, map.size());
+        assertTrue(map.containsKey("Zenith Health"));
+    }
+
+    @Test
+    public void testUnexpectedExceptionBranchHandled() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,John Doe,3,Acme Insurance
+            """;
+        Files.writeString(tempCsv, csv);
+
+        // Inject a null line manually to simulate bad data stream
+        var lines = Files.readAllLines(tempCsv);
+        lines.add(1, null);
+        Files.write(tempCsv, lines);
+
+        assertDoesNotThrow(() -> CSVReader.readEnrollees(tempCsv.toString()),
+                "Reader should skip null/invalid lines gracefully");
+    }
+    @Test
+    public void testDuplicateUserIdKeepsHighestVersion() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,John Doe,1,Acme Insurance
+            1,John Doe,3,Acme Insurance
+            1,John Doe,2,Acme Insurance
+            """;
+        Files.writeString(tempCsv, csv);
+
+        var map = CSVReader.readEnrollees(tempCsv.toString());
+
+        assertEquals(1, map.size());
+        var enrollee = map.get("Acme Insurance").get("1");
+        assertEquals(3, enrollee.version());
+    }
+
+    @Test
+    public void testDuplicateUserIdWithSameVersionKeepsFirst() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,John Doe,2,Acme Insurance
+            1,John Doe,2,Acme Insurance
+            """;
+        Files.writeString(tempCsv, csv);
+
+        var map = CSVReader.readEnrollees(tempCsv.toString());
+
+        assertEquals(1, map.size());
+        var enrollee = map.get("Acme Insurance").get("1");
+        assertEquals(2, enrollee.version());
+        assertEquals("John", enrollee.firstName());
+    }
+
 }
