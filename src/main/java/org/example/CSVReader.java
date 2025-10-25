@@ -143,7 +143,6 @@ public class CSVReader {
         } catch (Exception e) {
             logger.severe(() -> "Unexpected error parsing row: " + String.join(",", values) +
                     " | Exception: " + e.getClass().getSimpleName() + " - " + e.getMessage());
-            return null;
         }
         return null;
     }

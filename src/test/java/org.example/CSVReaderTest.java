@@ -110,4 +110,62 @@ public class CSVReaderTest {
         var map = CSVReader.readEnrollees(tempCsv.toString());
         assertTrue(map.isEmpty());
     }
+
+    @Test
+    public void testMalformedRowTriggersLoggerButSkipsLine() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,John Doe,abc,Acme Insurance
+            bad,data,line
+            2,Jane Smith,2,Zenith Health
+            """;
+        Files.writeString(tempCsv, csv);
+
+        var map = CSVReader.readEnrollees(tempCsv.toString());
+        assertEquals(1, map.size());
+        assertTrue(map.containsKey("Zenith Health"));
+    }
+    @Test
+    public void testMissingFileThrowsIOException() {
+        assertThrows(IOException.class, () -> CSVReader.readEnrollees("nonexistent.csv"));
+    }
+
+    @Test
+    public void testInvalidVersionHandledGracefully() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,John Doe,abc,Acme Insurance
+            2,Jane Smith,2,Zenith Health
+            """;
+        Files.writeString(tempCsv, csv);
+        var map = CSVReader.readEnrollees(tempCsv.toString());
+        assertEquals(1, map.size(), "Should skip invalid version and keep valid row");
+        assertTrue(map.containsKey("Zenith Health"));
+    }
+
+    @Test
+    public void testMalformedRowIsSkipped() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            bad,data,line
+            1,John Doe,3,Acme Insurance
+            """;
+        Files.writeString(tempCsv, csv);
+        var map = CSVReader.readEnrollees(tempCsv.toString());
+        assertEquals(1, map.size());
+        assertTrue(map.containsKey("Acme Insurance"));
+    }
+
+    @Test
+    public void testDuplicateSameVersionKeepsFirst() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,John Doe,2,Acme Insurance
+            1,John Doe,2,Acme Insurance
+            """;
+        Files.writeString(tempCsv, csv);
+        var map = CSVReader.readEnrollees(tempCsv.toString());
+        assertEquals(1, map.get("Acme Insurance").size());
+        assertEquals("John", map.get("Acme Insurance").get("1").firstName());
+    }
 }

@@ -35,7 +35,48 @@ public class SortingTest {
 
     @Test
     public void testEmptyInputReturnsEmptyMap() {
-        var sorted = Sorting.sortByName(Map.of());
-        assertTrue(sorted.isEmpty());
+        Map<String, Map<String, Enrolled>> result = Sorting.sortByName(Map.of());
+        assertTrue(result.isEmpty());
     }
+
+    @Test
+    public void testSortingHandlesEqualLastNames() {
+        Map<String, Enrolled> acme = Map.of(
+                "1", new Enrolled("1", "Alice", "Smith", 1, "Acme"),
+                "2", new Enrolled("2", "Bob", "Smith", 2, "Acme")
+        );
+
+        var sorted = Sorting.sortByName(Map.of("Acme", acme));
+        var list = new ArrayList<>(sorted.get("Acme").values());
+
+        assertEquals("Alice", list.get(0).firstName()); // should sort by first name if last names equal
+    }
+    @Test
+    public void testEmptyMapReturnsEmpty() {
+        var sorted = Sorting.sortByName(Map.of());
+        assertTrue(sorted.isEmpty(), "Empty input map should return empty output");
+    }
+
+    @Test
+    public void testSameLastNameSortsByFirstName() {
+        Map<String, Enrolled> acme = Map.of(
+                "1", new Enrolled("1", "Alice", "Smith", 1, "Acme"),
+                "2", new Enrolled("2", "Bob", "Smith", 2, "Acme")
+        );
+        var sorted = Sorting.sortByName(Map.of("Acme", acme));
+        var list = new ArrayList<>(sorted.get("Acme").values());
+        assertEquals("Alice", list.get(0).firstName());
+    }
+
+    @Test
+    public void testCaseInsensitiveSorting() {
+        Map<String, Enrolled> acme = Map.of(
+                "1", new Enrolled("1", "alice", "smith", 1, "Acme"),
+                "2", new Enrolled("2", "Bob", "Smith", 2, "Acme")
+        );
+        var sorted = Sorting.sortByName(Map.of("Acme", acme));
+        var list = new ArrayList<>(sorted.get("Acme").values());
+        assertEquals("alice", list.get(0).firstName().toLowerCase());
+    }
+
 }
