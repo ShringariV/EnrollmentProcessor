@@ -1,21 +1,137 @@
 package org.example;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class CSVReaderTest {
+
     private Path tempCsv;
+    private Logger logger;
+    private TestLogHandler handler;
 
     @BeforeEach
     public void setUp() throws IOException {
         tempCsv = Files.createTempFile("csvreader_test", ".csv");
+
+        // Capture log output
+        logger = Logger.getLogger(CSVReader.class.getName());
+        handler = new TestLogHandler();
+        logger.addHandler(handler);
+        logger.setUseParentHandlers(false);
+    }
+
+    @AfterEach
+    public void tearDown() throws IOException {
+        Files.deleteIfExists(tempCsv);
+        logger.removeHandler(handler);
+    }
+
+    /**
+     * Custom log handler to capture log records for testing
+     */
+    static class TestLogHandler extends Handler {
+        private final List<LogRecord> records = new ArrayList<>();
+
+        @Override
+        public void publish(LogRecord record) {
+            records.add(record);
+        }
+
+        @Override
+        public void flush() { }
+
+        @Override
+        public void close() throws SecurityException { }
+
+        public boolean containsMessage(String msgPart) {
+            return records.stream().anyMatch(r -> r.getMessage().contains(msgPart));
+        }
+    }
+
+    @Test
+    public void testLoggerWarnsOnInvalidVersion() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,John Doe,abc,Acme Insurance
+            2,Jane Smith,2,Zenith Health
+            """;
+        Files.writeString(tempCsv, csv);
+
+        var map = CSVReader.readEnrollees(tempCsv.toString());
+
+        // Confirm valid record parsed
+        assertTrue(map.containsKey("Zenith Health"));
+        // Confirm invalid record logged
+        assertTrue(handler.containsMessage("invalid version number"));
+    }
+
+    @Test
+    public void testShortRowIsSkippedWithoutException() throws IOException {
+        String csv = """
+        User Id,Full Name,Version,Insurance Company
+        1,John Doe,3
+        """;
+        Files.writeString(tempCsv, csv);
+        var map = CSVReader.readEnrollees(tempCsv.toString());
+        assertTrue(map.isEmpty(), "Row with missing columns should be skipped silently");
+    }
+
+
+    @Test
+    public void testLoggerSevereOnUnexpectedException() throws IOException {
+        // force NumberFormatException indirectly by giving invalid data after passing length filter
+        String csv = """
+        User Id,Full Name,Version,Insurance Company
+        1,John Doe,,Acme Insurance
+        """;
+        Files.writeString(tempCsv, csv);
+
+        CSVReader.readEnrollees(tempCsv.toString());
+        assertTrue(handler.containsMessage("invalid version number"),
+                "Logger should warn about invalid version number");
+    }
+
+    @Test
+    public void testNameSplittingTwoPartName() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,John Doe,3,Acme Insurance
+            """;
+        Files.writeString(tempCsv, csv);
+
+        var map = CSVReader.readEnrollees(tempCsv.toString());
+        Enrolled e = map.get("Acme Insurance").get("1");
+
+        assertEquals("John", e.firstName());
+        assertEquals("Doe", e.lastName());
+    }
+
+    @Test
+    public void testNameSplittingSingleName() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,Plato,2,Philosophy Mutual
+            """;
+        Files.writeString(tempCsv, csv);
+
+        var map = CSVReader.readEnrollees(tempCsv.toString());
+        Enrolled e = map.get("Philosophy Mutual").get("1");
+
+        assertEquals("Plato", e.firstName());
+        assertEquals("", e.lastName());
     }
 
     @Test

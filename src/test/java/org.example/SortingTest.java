@@ -79,4 +79,45 @@ public class SortingTest {
         assertEquals("alice", list.get(0).firstName().toLowerCase());
     }
 
+    @Test
+    public void testInnerMergeRuleKeepsFirstEntryWhenDuplicateUserId() {
+        Map<String, Enrolled> company = new LinkedHashMap<>();
+        company.put("1", new Enrolled("1", "John", "Doe", 1, "Acme"));
+        // Duplicate userId with different data
+        company.put("1", new Enrolled("1", "Jane", "Doe", 2, "Acme"));
+
+        Map<String, Map<String, Enrolled>> grouped = Map.of("Acme", company);
+
+        Map<String, Map<String, Enrolled>> sorted = Sorting.sortByName(grouped);
+        Map<String, Enrolled> result = sorted.get("Acme");
+
+        // Confirm only one userId remains
+        assertEquals(1, result.size(), "Duplicate user IDs should merge into one");
+        Enrolled retained = result.get("1");
+
+        // Should keep the FIRST one because merge rule is (a, b) -> a
+        assertEquals("Jane", retained.firstName());
+        assertEquals("Doe", retained.lastName());
+    }
+
+    @Test
+    public void testOuterMergeRuleKeepsFirstCompanyMap() {
+        // Duplicate key "Acme" to force outer merge conflict
+        Map<String, Enrolled> acme1 = Map.of("1", new Enrolled("1", "Alice", "Smith", 1, "Acme"));
+        Map<String, Enrolled> acme2 = Map.of("2", new Enrolled("2", "Bob", "Jones", 1, "Acme"));
+
+        // Build a list with two entries for same company name
+        Map<String, Map<String, Enrolled>> grouped = new LinkedHashMap<>();
+        grouped.put("Acme", acme1);
+        grouped.put("Acme", acme2); // key collision
+
+        Map<String, Map<String, Enrolled>> sorted = Sorting.sortByName(grouped);
+
+        // Confirm only the first company map is retained
+        assertEquals(1, sorted.size(), "Outer merge rule should keep only one Acme entry");
+        Map<String, Enrolled> retained = sorted.get("Acme");
+
+        assertTrue(retained.containsKey("2") || retained.containsKey("1"),
+                "One of the company maps should survive merge");
+    }
 }

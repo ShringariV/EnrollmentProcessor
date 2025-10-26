@@ -3,6 +3,7 @@ package org.example;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Scanner;
 /*
 ArrayList — Dynamic Array
 
@@ -72,10 +73,13 @@ Space Complexity:
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 public class Main {
     public static void main(String[] args) {
-        String filePath = "src/main/resources/testingReading.csv";
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.print("Enter the path to the CSV file: ");
+        String filePath = scanner.nextLine();
 
         try {
-            System.out.println("Enrollment File Processor");
+            System.out.println("\nEnrollment File Processor");
 
             Map<String, Map<String, Enrolled>> companyMap = CSVReader.readEnrollees(filePath);
             System.out.println("Successfully read and grouped enrollees by insurance company.");
@@ -86,7 +90,7 @@ public class Main {
             CSVWriter.writeByCompany(sortedMap);
             System.out.println("Successfully wrote sorted CSV files to: src/main/resources/output");
 
-            System.out.println("Enrollees by Insurance Company");
+            System.out.println("\nEnrollees by Insurance Company:");
             sortedMap.forEach((company, enrollees) -> {
                 System.out.println("\n" + company);
                 System.out.println("=".repeat(company.length()));
@@ -98,5 +102,7 @@ public class Main {
         } catch (IOException e) {
             System.err.println("Error during processing: " + e.getMessage());
         }
+
+        scanner.close();
     }
 }
