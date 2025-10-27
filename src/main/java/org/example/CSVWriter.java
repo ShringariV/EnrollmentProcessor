@@ -49,7 +49,7 @@ public class CSVWriter {
             Path filePath = outputDirectory.resolve(fileName);
 
             try {
-                
+
                 Stream<String> lines = Stream.concat(
                         Stream.of("User ID,Full Name,Version,Insurance Company"), // header
                         enrolleeMap.values().stream()

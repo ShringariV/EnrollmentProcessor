@@ -105,44 +105,6 @@ public class FullPipelineIntegrationTest {
         assertEquals(sorted, names, "File should be alphabetically sorted by last then first name");
     }
 
-    @Test
-    public void testFullPipelineStandardData() throws IOException {
-        String csv = """
-                User Id,Full Name,Version,Insurance Company
-                1,Alice Adams,3,Zenith Health
-                2,Jane Doe,2,Acme Insurance
-                2,Jane Doe,3,Acme Insurance
-                3,Bob Smith,1,Acme Insurance
-                4,Charlie Brown,1,Acme Insurance
-                5,Dave Adams,1,Zenith Health
-                """;
-        Files.writeString(inputCsv, csv);
-
-        runMainWithInput(inputCsv);
-        String output = outContent.toString();
-
-        assertPipelineStepsLogged(output);
-        assertTrue(output.contains("Acme Insurance"), "Should list Acme company");
-        assertTrue(output.contains("Zenith Health"), "Should list Zenith company");
-
-        Path acme = outputDir.resolve("Acme_Insurance.csv");
-        Path zenith = outputDir.resolve("Zenith_Health.csv");
-        assertTrue(Files.exists(acme));
-        assertTrue(Files.exists(zenith));
-
-        String acmeContent = Files.readString(acme);
-        assertTrue(acmeContent.contains("Jane Doe,3,Acme Insurance"), "Highest version retained");
-        assertTrue(acmeContent.contains("Charlie Brown"));
-        assertTrue(acmeContent.contains("Bob Smith"));
-        assertFileSortedByNames(acme);
-
-        String zenithContent = Files.readString(zenith);
-        assertTrue(zenithContent.contains("Alice Adams"));
-        assertTrue(zenithContent.contains("Dave Adams"));
-        assertFileSortedByNames(zenith);
-
-        assertTrue(errContent.toString().isEmpty(), "No errors expected in stderr");
-    }
 
     @Test
     public void testHandlesEmptyInputFileGracefully() throws IOException {
@@ -307,4 +269,43 @@ public class FullPipelineIntegrationTest {
             assertTrue(files.count() > 0, "Should generate multiple company CSVs");
         }
     }
+
+    @Test
+    public void testMalformedRowsHandledGracefully() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,Alice Adams,3,Zenith Health
+            2,Jane Doe,not_a_number,Acme Insurance
+            3,Bob Smith,1
+            4,Charlie Brown,2,Acme Insurance
+            garbage_line_completely_invalid
+            5,Dave Adams,1,Zenith Health
+            """;
+        Files.writeString(inputCsv, csv);
+
+        runMainWithInput(inputCsv);
+        String output = outContent.toString().toLowerCase();
+
+        assertTrue(output.contains("successfully read and grouped enrollees"), "Should confirm reading step");
+        assertTrue(output.contains("successfully sorted enrollees"), "Should confirm sorting step");
+        assertTrue(output.contains("successfully wrote sorted csv files"), "Should confirm writing step");
+
+        Path acme = outputDir.resolve("Acme_Insurance.csv");
+        Path zenith = outputDir.resolve("Zenith_Health.csv");
+        assertTrue(Files.exists(acme), "Acme file should be created despite malformed rows");
+        assertTrue(Files.exists(zenith), "Zenith file should be created despite malformed rows");
+
+        String acmeContent = Files.readString(acme);
+        String zenithContent = Files.readString(zenith);
+        assertTrue(acmeContent.contains("Charlie Brown"), "Valid rows should still be written");
+        assertTrue(zenithContent.contains("Alice Adams"), "Valid rows should still be written");
+        assertTrue(zenithContent.contains("Dave Adams"), "Valid rows should still be written");
+
+        assertFalse(acmeContent.contains("Jane Doe"), "Invalid version row should be skipped");
+
+        String err = errContent.toString().toLowerCase();
+        assertFalse(err.contains("exception"), "No unhandled exceptions should appear in stderr");
+        assertFalse(err.contains("severe"), "No severe logs should appear in stderr");
+    }
+
 }

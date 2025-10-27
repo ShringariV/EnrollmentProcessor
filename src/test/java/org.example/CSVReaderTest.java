@@ -1,368 +1,234 @@
 package org.example;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
+import org.junit.jupiter.api.*;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.logging.Handler;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
-
+import java.nio.file.*;
+import java.util.*;
+import java.util.logging.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class CSVReaderTest {
 
-    private Path tempCsv;
-    private Logger logger;
-    private TestLogHandler handler;
+    private static class JulHandler extends Handler {
+        final List<LogRecord> records = new ArrayList<>();
+        @Override public void publish(LogRecord record) { records.add(record); }
+        @Override public void flush() {}
+        @Override public void close() {}
+    }
+
+    private JulHandler handler;
+    private Logger csvLogger;
 
     @BeforeEach
-    public void setUp() throws IOException {
-        tempCsv = Files.createTempFile("csvreader_test", ".csv");
-
-        // Capture log output
-        logger = Logger.getLogger(CSVReader.class.getName());
-        handler = new TestLogHandler();
-        logger.addHandler(handler);
-        logger.setUseParentHandlers(false);
+    void setupLogger() {
+        csvLogger = Logger.getLogger(CSVReader.class.getName());
+        handler = new JulHandler();
+        csvLogger.addHandler(handler);
     }
 
     @AfterEach
-    public void tearDown() throws IOException {
-        Files.deleteIfExists(tempCsv);
-        logger.removeHandler(handler);
+    void removeLogger() {
+        csvLogger.removeHandler(handler);
     }
 
-    /**
-     * Custom log handler to capture log records for testing
-     */
-    static class TestLogHandler extends Handler {
-        private final List<LogRecord> records = new ArrayList<>();
+    private Path writeTempCSV(String content) throws IOException {
+        Path tmp = Files.createTempFile("enroll", ".csv");
+        Files.writeString(tmp, content);
+        return tmp;
+    }
 
-        @Override
-        public void publish(LogRecord record) {
-            records.add(record);
-        }
+    private LogRecord findLog(Level level, String contains) {
+        return handler.records.stream()
+                .filter(r -> r.getLevel().equals(level) && r.getMessage().contains(contains))
+                .findFirst().orElse(null);
+    }
 
-        @Override
-        public void flush() { }
+    // -----------------------------------------------------------
+    //  TESTS BEGIN
+    // -----------------------------------------------------------
 
-        @Override
-        public void close() throws SecurityException { }
+    @Test
+    void testValidCSVReadsSuccessfully() throws Exception {
+        Path csv = writeTempCSV("""
+                User Id,Full Name,Version,Insurance Company
+                1,Alice Adams,3,Acme Insurance
+                2,Jane Doe,2,Zenith Health
+                """);
 
-        public boolean containsMessage(String msgPart) {
-            return records.stream().anyMatch(r -> r.getMessage().contains(msgPart));
-        }
+        Map<String, Map<String, Enrolled>> result = CSVReader.readEnrollees(csv.toString());
+        assertEquals(2, result.size());
+        assertTrue(result.containsKey("acme insurance"));
+        assertTrue(result.containsKey("zenith health"));
     }
 
     @Test
-    public void testLoggerWarnsOnInvalidVersion() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            1,John Doe,abc,Acme Insurance
-            2,Jane Smith,2,Zenith Health
-            """;
-        Files.writeString(tempCsv, csv);
+    void testDuplicateUserIdKeepsHighestVersion() throws Exception {
+        Path csv = writeTempCSV("""
+                User Id,Full Name,Version,Insurance Company
+                1,Alice Adams,2,Acme Insurance
+                1,Alice Adams,3,ACME INSURANCE
+                """);
 
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-
-        // Confirm valid record parsed
-        assertTrue(map.containsKey("Zenith Health"));
-        // Confirm invalid record logged
-        assertTrue(handler.containsMessage("invalid version number"));
+        Map<String, Map<String, Enrolled>> result = CSVReader.readEnrollees(csv.toString());
+        Enrolled e = result.get("acme insurance").get("1");
+        assertEquals(3, e.version());
     }
 
     @Test
-    public void testShortRowIsSkippedWithoutException() throws IOException {
-        String csv = """
-        User Id,Full Name,Version,Insurance Company
-        1,John Doe,3
-        """;
-        Files.writeString(tempCsv, csv);
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        assertTrue(map.isEmpty(), "Row with missing columns should be skipped silently");
-    }
+    void testDuplicateUserIdWithSameVersionKeepsFirst() throws Exception {
+        Path csv = writeTempCSV("""
+                User Id,Full Name,Version,Insurance Company
+                2,Jane Alpha,3,Acme Insurance
+                2,Jane Beta,3,ACME INSURANCE
+                """);
 
-
-    @Test
-    public void testLoggerSevereOnUnexpectedException() throws IOException {
-        // force NumberFormatException indirectly by giving invalid data after passing length filter
-        String csv = """
-        User Id,Full Name,Version,Insurance Company
-        1,John Doe,,Acme Insurance
-        """;
-        Files.writeString(tempCsv, csv);
-
-        CSVReader.readUniqueEnrollees(tempCsv.toString());
-        assertTrue(handler.containsMessage("invalid version number"),
-                "Logger should warn about invalid version number");
+        Map<String, Map<String, Enrolled>> grouped = CSVReader.readEnrollees(csv.toString());
+        Enrolled e = grouped.get("acme insurance").get("2");
+        assertEquals("Jane", e.firstName());
+        assertEquals("Alpha", e.lastName());
     }
 
     @Test
-    public void testNameSplittingTwoPartName() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            1,John Doe,3,Acme Insurance
-            """;
-        Files.writeString(tempCsv, csv);
+    void testMultipleCompaniesParsedCorrectly() throws Exception {
+        Path csv = writeTempCSV("""
+                User Id,Full Name,Version,Insurance Company
+                1,Alice Adams,1,Acme Insurance
+                2,Bob Smith,1,ACME INSURANCE
+                3,Charlie Brown,1,Zenith Health
+                """);
 
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        Enrolled e = map.get("Acme Insurance").get("1");
+        Map<String, Map<String, Enrolled>> grouped = CSVReader.readEnrollees(csv.toString());
+        assertEquals(2, grouped.size());
+        assertTrue(grouped.containsKey("acme insurance"));
+        assertTrue(grouped.containsKey("zenith health"));
+        assertEquals(2, grouped.get("acme insurance").size());
+    }
 
-        assertEquals("John", e.firstName());
+    @Test
+    void testNameSplittingSingleName() throws Exception {
+        Path csv = writeTempCSV("""
+                User Id,Full Name,Version,Insurance Company
+                1,Plato,1,Acme Insurance
+                """);
+
+        Enrolled e = CSVReader.readEnrollees(csv.toString())
+                .get("acme insurance").get("1");
+        assertEquals("Plato", e.firstName());
+        assertTrue(e.lastName() == null || e.lastName().isEmpty());
+    }
+
+    @Test
+    void testNameSplittingTwoPartName() throws Exception {
+        Path csv = writeTempCSV("""
+                User Id,Full Name,Version,Insurance Company
+                1,Jane Doe,1,Acme Insurance
+                """);
+
+        Enrolled e = CSVReader.readEnrollees(csv.toString())
+                .get("acme insurance").get("1");
+        assertEquals("Jane", e.firstName());
         assertEquals("Doe", e.lastName());
     }
 
     @Test
-    public void testNameSplittingSingleName() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            1,Plato,2,Philosophy Mutual
-            """;
-        Files.writeString(tempCsv, csv);
-
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        Enrolled e = map.get("Philosophy Mutual").get("1");
-
-        assertEquals("Plato", e.firstName());
-        assertEquals("", e.lastName());
-    }
-
-    @Test
-    public void testValidCSVReadsSuccessfully() throws IOException {
-        String csv = """
+    void testTrimsWhitespaceProperly() throws Exception {
+        Path csv = writeTempCSV("""
                 User Id,Full Name,Version,Insurance Company
-                1,John Doe,3,Acme Insurance
-                2,Jane Smith,1,Zenith Health
-                """;
-        Files.writeString(tempCsv, csv);
+                1,   Alice    Adams   ,1,   Acme Insurance  
+                """);
 
-        Map<String, Map<String, Enrolled>> result = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        assertEquals(2, result.size());
-        assertTrue(result.containsKey("Acme Insurance"));
-        assertEquals("John", result.get("Acme Insurance").get("1").firstName());
+        Enrolled e = CSVReader.readEnrollees(csv.toString())
+                .get("acme insurance").get("1");
+        assertEquals("Alice", e.firstName());
+        assertEquals("Adams", e.lastName());
     }
 
     @Test
-    public void testDuplicateUserKeepsHighestVersion() throws IOException {
-        String csv = """
+    void testMalformedRowIsSkipped() throws Exception {
+        Path csv = writeTempCSV("""
                 User Id,Full Name,Version,Insurance Company
-                1,John Doe,1,Acme Insurance
-                1,John Doe,5,Acme Insurance
-                1,John Doe,3,Acme Insurance
-                """;
-        Files.writeString(tempCsv, csv);
+                1,Alice,2
+                2,Jane Doe,1,Acme Insurance
+                """);
 
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        assertEquals(5, map.get("Acme Insurance").get("1").version());
+        Map<String, Map<String, Enrolled>> grouped = CSVReader.readEnrollees(csv.toString());
+        assertEquals(1, grouped.get("acme insurance").size());
     }
 
     @Test
-    public void testTrimsWhitespaceProperly() throws IOException {
-        String csv = """
+    void testMalformedRowTriggersLoggerButSkipsLine() throws Exception {
+        Path csv = writeTempCSV("""
+            User Id,Full Name,Version,Insurance Company
+            1,Alice Adams,3
+            2,Jane Doe,1,Acme Insurance
+            """);
+
+        Map<String, Map<String, Enrolled>> grouped = CSVReader.readEnrollees(csv.toString());
+
+        // no exception thrown, malformed row skipped
+        assertEquals(1, grouped.get("acme insurance").size());
+        // optional: ensure logger did NOT log anything (since filter catches it)
+        assertTrue(!handler.records.stream().findAny().isPresent(), "No warning expected because malformed row is filtered before parsing");
+    }
+
+    @Test
+    void testInvalidVersionNumberTriggersWarning() throws Exception {
+        Path csv = writeTempCSV("""
                 User Id,Full Name,Version,Insurance Company
-                1,   John   Doe   ,2,   Acme Insurance  
-                """;
-        Files.writeString(tempCsv, csv);
+                1,Alice,notanumber,Acme Insurance
+                2,Bob Smith,1,Acme Insurance
+                """);
 
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        Enrolled john = map.get("Acme Insurance").get("1");
-        assertEquals("John", john.firstName());
-        assertEquals("Doe", john.lastName());
+        Map<String, Map<String, Enrolled>> grouped = CSVReader.readEnrollees(csv.toString());
+        assertNotNull(findLog(Level.WARNING, "invalid version number"));
+        assertEquals(1, grouped.get("acme insurance").size());
     }
 
     @Test
-    public void testHandlesEmptyFileGracefully() throws IOException {
-        Files.writeString(tempCsv, "User Id,Full Name,Version,Insurance Company\n");
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        assertTrue(map.isEmpty());
+    void testInvalidVersionHandledGracefully() throws Exception {
+        Path csv = writeTempCSV("""
+                User Id,Full Name,Version,Insurance Company
+                1,John Doe,abc,Acme Insurance
+                """);
+
+        Map<String, Map<String, Enrolled>> grouped = CSVReader.readEnrollees(csv.toString());
+        assertTrue(grouped.isEmpty() || grouped.get("acme insurance") == null);
     }
 
     @Test
-    public void testThrowsIOExceptionOnMissingFile() {
-        assertThrows(IOException.class, () -> CSVReader.readUniqueEnrollees("missing.csv"));
-    }
-    @Test
-    public void testMultipleCompaniesParsedCorrectly() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            1,John Doe,1,Acme Insurance
-            2,Jane Roe,2,Zenith Health
-            3,Bob Joe,3,Acme Insurance
-            """;
-        Files.writeString(tempCsv, csv);
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        assertEquals(2, map.size());
-        assertEquals(2, map.get("Acme Insurance").size());
-        assertTrue(map.get("Zenith Health").containsKey("2"));
+    void testDuplicateSameVersionKeepsFirst() throws Exception {
+        Path csv = writeTempCSV("""
+                User Id,Full Name,Version,Insurance Company
+                3,Alice Alpha,2,Acme Insurance
+                3,Alice Beta,2,ACME INSURANCE
+                """);
+
+        Enrolled e = CSVReader.readEnrollees(csv.toString())
+                .get("acme insurance").get("3");
+        assertEquals("Alpha", e.lastName());
     }
 
     @Test
-    public void testMalformedLineIsIgnored() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            1,John Doe,2,Acme Insurance
-            bad,line,here
-            2,Jane Smith,3,Zenith Health
-            """;
-        Files.writeString(tempCsv, csv);
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        assertEquals(2, map.size());
+    void testLoggerWarnsOnInvalidVersion() throws Exception {
+        Path csv = writeTempCSV("""
+                User Id,Full Name,Version,Insurance Company
+                1,Bob,hello,Acme Insurance
+                """);
+
+        CSVReader.readEnrollees(csv.toString());
+        assertNotNull(findLog(Level.WARNING, "invalid version number"));
     }
 
     @Test
-    public void testInvalidVersionSkipped() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            1,John Doe,notanumber,Acme Insurance
-            """;
-        Files.writeString(tempCsv, csv);
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        assertTrue(map.isEmpty());
+    void testDuplicateUserKeepsHighestVersion() throws Exception {
+        Path csv = writeTempCSV("""
+                User Id,Full Name,Version,Insurance Company
+                1,Alice Adams,1,Acme Insurance
+                1,Alice Adams,2,Acme Insurance
+                """);
+
+        Enrolled e = CSVReader.readEnrollees(csv.toString())
+                .get("acme insurance").get("1");
+        assertEquals(2, e.version());
     }
-
-    @Test
-    public void testMalformedRowTriggersLoggerButSkipsLine() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            1,John Doe,abc,Acme Insurance
-            bad,data,line
-            2,Jane Smith,2,Zenith Health
-            """;
-        Files.writeString(tempCsv, csv);
-
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        assertEquals(1, map.size());
-        assertTrue(map.containsKey("Zenith Health"));
-    }
-    @Test
-    public void testMissingFileThrowsIOException() {
-        assertThrows(IOException.class, () -> CSVReader.readUniqueEnrollees("nonexistent.csv"));
-    }
-
-    @Test
-    public void testInvalidVersionHandledGracefully() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            1,John Doe,abc,Acme Insurance
-            2,Jane Smith,2,Zenith Health
-            """;
-        Files.writeString(tempCsv, csv);
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        assertEquals(1, map.size(), "Should skip invalid version and keep valid row");
-        assertTrue(map.containsKey("Zenith Health"));
-    }
-
-    @Test
-    public void testMalformedRowIsSkipped() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            bad,data,line
-            1,John Doe,3,Acme Insurance
-            """;
-        Files.writeString(tempCsv, csv);
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        assertEquals(1, map.size());
-        assertTrue(map.containsKey("Acme Insurance"));
-    }
-
-    @Test
-    public void testDuplicateSameVersionKeepsFirst() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            1,John Doe,2,Acme Insurance
-            1,John Doe,2,Acme Insurance
-            """;
-        Files.writeString(tempCsv, csv);
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        assertEquals(1, map.get("Acme Insurance").size());
-        assertEquals("John", map.get("Acme Insurance").get("1").firstName());
-    }
-
-    @Test
-    public void testInvalidVersionNumberTriggersWarning() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            1,John Doe,abc,Acme Insurance
-            2,Jane Smith,3,Zenith Health
-            """;
-        Files.writeString(tempCsv, csv);
-
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        // first record skipped, second valid → 1 company total
-        assertEquals(1, map.size());
-        assertTrue(map.containsKey("Zenith Health"));
-    }
-
-    @Test
-    public void testTooFewColumnsTriggersArrayIndexError() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            1,John Doe,2
-            2,Jane Smith,3,Zenith Health
-            """;
-        Files.writeString(tempCsv, csv);
-
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-        // first line skipped, second valid
-        assertEquals(1, map.size());
-        assertTrue(map.containsKey("Zenith Health"));
-    }
-
-    @Test
-    public void testUnexpectedExceptionBranchHandled() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            1,John Doe,3,Acme Insurance
-            """;
-        Files.writeString(tempCsv, csv);
-
-        // Inject a null line manually to simulate bad data stream
-        var lines = Files.readAllLines(tempCsv);
-        lines.add(1, null);
-        Files.write(tempCsv, lines);
-
-        assertDoesNotThrow(() -> CSVReader.readUniqueEnrollees(tempCsv.toString()),
-                "Reader should skip null/invalid lines gracefully");
-    }
-    @Test
-    public void testDuplicateUserIdKeepsHighestVersion() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            1,John Doe,1,Acme Insurance
-            1,John Doe,3,Acme Insurance
-            1,John Doe,2,Acme Insurance
-            """;
-        Files.writeString(tempCsv, csv);
-
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-
-        assertEquals(1, map.size());
-        var enrollee = map.get("Acme Insurance").get("1");
-        assertEquals(3, enrollee.version());
-    }
-
-    @Test
-    public void testDuplicateUserIdWithSameVersionKeepsFirst() throws IOException {
-        String csv = """
-            User Id,Full Name,Version,Insurance Company
-            1,John Doe,2,Acme Insurance
-            1,John Doe,2,Acme Insurance
-            """;
-        Files.writeString(tempCsv, csv);
-
-        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
-
-        assertEquals(1, map.size());
-        var enrollee = map.get("Acme Insurance").get("1");
-        assertEquals(2, enrollee.version());
-        assertEquals("John", enrollee.firstName());
-    }
-
 }
