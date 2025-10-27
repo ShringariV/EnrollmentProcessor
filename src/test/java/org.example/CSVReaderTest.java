@@ -70,7 +70,7 @@ public class CSVReaderTest {
             """;
         Files.writeString(tempCsv, csv);
 
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
 
         // Confirm valid record parsed
         assertTrue(map.containsKey("Zenith Health"));
@@ -85,7 +85,7 @@ public class CSVReaderTest {
         1,John Doe,3
         """;
         Files.writeString(tempCsv, csv);
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         assertTrue(map.isEmpty(), "Row with missing columns should be skipped silently");
     }
 
@@ -99,7 +99,7 @@ public class CSVReaderTest {
         """;
         Files.writeString(tempCsv, csv);
 
-        CSVReader.readEnrollees(tempCsv.toString());
+        CSVReader.readUniqueEnrollees(tempCsv.toString());
         assertTrue(handler.containsMessage("invalid version number"),
                 "Logger should warn about invalid version number");
     }
@@ -112,7 +112,7 @@ public class CSVReaderTest {
             """;
         Files.writeString(tempCsv, csv);
 
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         Enrolled e = map.get("Acme Insurance").get("1");
 
         assertEquals("John", e.firstName());
@@ -127,7 +127,7 @@ public class CSVReaderTest {
             """;
         Files.writeString(tempCsv, csv);
 
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         Enrolled e = map.get("Philosophy Mutual").get("1");
 
         assertEquals("Plato", e.firstName());
@@ -143,7 +143,7 @@ public class CSVReaderTest {
                 """;
         Files.writeString(tempCsv, csv);
 
-        Map<String, Map<String, Enrolled>> result = CSVReader.readEnrollees(tempCsv.toString());
+        Map<String, Map<String, Enrolled>> result = CSVReader.readUniqueEnrollees(tempCsv.toString());
         assertEquals(2, result.size());
         assertTrue(result.containsKey("Acme Insurance"));
         assertEquals("John", result.get("Acme Insurance").get("1").firstName());
@@ -159,7 +159,7 @@ public class CSVReaderTest {
                 """;
         Files.writeString(tempCsv, csv);
 
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         assertEquals(5, map.get("Acme Insurance").get("1").version());
     }
 
@@ -171,7 +171,7 @@ public class CSVReaderTest {
                 """;
         Files.writeString(tempCsv, csv);
 
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         Enrolled john = map.get("Acme Insurance").get("1");
         assertEquals("John", john.firstName());
         assertEquals("Doe", john.lastName());
@@ -180,13 +180,13 @@ public class CSVReaderTest {
     @Test
     public void testHandlesEmptyFileGracefully() throws IOException {
         Files.writeString(tempCsv, "User Id,Full Name,Version,Insurance Company\n");
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         assertTrue(map.isEmpty());
     }
 
     @Test
     public void testThrowsIOExceptionOnMissingFile() {
-        assertThrows(IOException.class, () -> CSVReader.readEnrollees("missing.csv"));
+        assertThrows(IOException.class, () -> CSVReader.readUniqueEnrollees("missing.csv"));
     }
     @Test
     public void testMultipleCompaniesParsedCorrectly() throws IOException {
@@ -197,7 +197,7 @@ public class CSVReaderTest {
             3,Bob Joe,3,Acme Insurance
             """;
         Files.writeString(tempCsv, csv);
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         assertEquals(2, map.size());
         assertEquals(2, map.get("Acme Insurance").size());
         assertTrue(map.get("Zenith Health").containsKey("2"));
@@ -212,7 +212,7 @@ public class CSVReaderTest {
             2,Jane Smith,3,Zenith Health
             """;
         Files.writeString(tempCsv, csv);
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         assertEquals(2, map.size());
     }
 
@@ -223,7 +223,7 @@ public class CSVReaderTest {
             1,John Doe,notanumber,Acme Insurance
             """;
         Files.writeString(tempCsv, csv);
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         assertTrue(map.isEmpty());
     }
 
@@ -237,13 +237,13 @@ public class CSVReaderTest {
             """;
         Files.writeString(tempCsv, csv);
 
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         assertEquals(1, map.size());
         assertTrue(map.containsKey("Zenith Health"));
     }
     @Test
     public void testMissingFileThrowsIOException() {
-        assertThrows(IOException.class, () -> CSVReader.readEnrollees("nonexistent.csv"));
+        assertThrows(IOException.class, () -> CSVReader.readUniqueEnrollees("nonexistent.csv"));
     }
 
     @Test
@@ -254,7 +254,7 @@ public class CSVReaderTest {
             2,Jane Smith,2,Zenith Health
             """;
         Files.writeString(tempCsv, csv);
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         assertEquals(1, map.size(), "Should skip invalid version and keep valid row");
         assertTrue(map.containsKey("Zenith Health"));
     }
@@ -267,7 +267,7 @@ public class CSVReaderTest {
             1,John Doe,3,Acme Insurance
             """;
         Files.writeString(tempCsv, csv);
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         assertEquals(1, map.size());
         assertTrue(map.containsKey("Acme Insurance"));
     }
@@ -280,7 +280,7 @@ public class CSVReaderTest {
             1,John Doe,2,Acme Insurance
             """;
         Files.writeString(tempCsv, csv);
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         assertEquals(1, map.get("Acme Insurance").size());
         assertEquals("John", map.get("Acme Insurance").get("1").firstName());
     }
@@ -294,7 +294,7 @@ public class CSVReaderTest {
             """;
         Files.writeString(tempCsv, csv);
 
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         // first record skipped, second valid → 1 company total
         assertEquals(1, map.size());
         assertTrue(map.containsKey("Zenith Health"));
@@ -309,7 +309,7 @@ public class CSVReaderTest {
             """;
         Files.writeString(tempCsv, csv);
 
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
         // first line skipped, second valid
         assertEquals(1, map.size());
         assertTrue(map.containsKey("Zenith Health"));
@@ -328,7 +328,7 @@ public class CSVReaderTest {
         lines.add(1, null);
         Files.write(tempCsv, lines);
 
-        assertDoesNotThrow(() -> CSVReader.readEnrollees(tempCsv.toString()),
+        assertDoesNotThrow(() -> CSVReader.readUniqueEnrollees(tempCsv.toString()),
                 "Reader should skip null/invalid lines gracefully");
     }
     @Test
@@ -341,7 +341,7 @@ public class CSVReaderTest {
             """;
         Files.writeString(tempCsv, csv);
 
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
 
         assertEquals(1, map.size());
         var enrollee = map.get("Acme Insurance").get("1");
@@ -357,7 +357,7 @@ public class CSVReaderTest {
             """;
         Files.writeString(tempCsv, csv);
 
-        var map = CSVReader.readEnrollees(tempCsv.toString());
+        var map = CSVReader.readUniqueEnrollees(tempCsv.toString());
 
         assertEquals(1, map.size());
         var enrollee = map.get("Acme Insurance").get("1");
