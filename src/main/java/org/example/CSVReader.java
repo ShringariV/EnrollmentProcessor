@@ -146,6 +146,10 @@ public class CSVReader {
             String fullName = values[1].trim().replaceAll("\\s+", " ");
             int version = Integer.parseInt(values[2].trim());
             String insuranceCompany = values[3].trim();
+            if (insuranceCompany.isEmpty()) {
+                logger.warning("Skipping row due to missing Insurance Company: " + String.join(",", values));
+                return null;
+            }
 
             String[] nameParts = fullName.split(" ");
             String firstName = nameParts.length >= 1 ? nameParts[0] : "";

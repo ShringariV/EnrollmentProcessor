@@ -307,5 +307,86 @@ public class FullPipelineIntegrationTest {
         assertFalse(err.contains("exception"), "No unhandled exceptions should appear in stderr");
         assertFalse(err.contains("severe"), "No severe logs should appear in stderr");
     }
+    @Test
+    public void testDuplicateUserIdSameVersionKeepsFirst() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,Jane Doe,3,Acme Insurance
+            1,Jane Doe,3,Acme Insurance
+            2,Alice Adams,1,Zenith Health
+            """;
+        Files.writeString(inputCsv, csv);
+        runMainWithInput(inputCsv);
 
+        Path acme = outputDir.resolve("Acme_Insurance.csv");
+        String content = Files.readString(acme);
+        assertEquals(1, content.lines().filter(l -> l.contains("Jane Doe")).count(),
+                "Should keep only one Jane Doe entry");
+    }
+
+
+    @Test
+    public void testCorruptedHeaderStillProcesses() throws IOException {
+        String csv = """
+            user id , full name , version , insurance company
+            1,Jane Doe,2,Acme Insurance
+            2,Bob Smith,3,Zenith Health
+            """;
+        Files.writeString(inputCsv, csv);
+        runMainWithInput(inputCsv);
+
+        Path acme = outputDir.resolve("Acme_Insurance.csv");
+        assertTrue(Files.exists(acme), "Should still process even with malformed header");
+    }
+
+    @Test
+    public void testHandlesBlankLinesGracefully() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+
+            1,Jane Doe,2,Acme Insurance
+
+            2,Bob Smith,3,Zenith Health
+
+            """;
+        Files.writeString(inputCsv, csv);
+        runMainWithInput(inputCsv);
+
+        Path acme = outputDir.resolve("Acme_Insurance.csv");
+        Path zenith = outputDir.resolve("Zenith_Health.csv");
+        assertTrue(Files.exists(acme));
+        assertTrue(Files.exists(zenith));
+    }
+
+    @Test
+    public void testSpecialCharactersInNamesHandled() throws IOException {
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,Élodie Durand,1,Acme Insurance
+            2,Anne-Marie O'Neill,2,Acme Insurance
+            """;
+        Files.writeString(inputCsv, csv);
+        runMainWithInput(inputCsv);
+
+        Path acme = outputDir.resolve("Acme_Insurance.csv");
+        String content = Files.readString(acme);
+        assertTrue(content.contains("Élodie Durand"));
+        assertTrue(content.contains("Anne-Marie O'Neill"));
+    }
+
+    @Test
+    public void testOutputFilesOverwrittenNotAppended() throws IOException {
+        Path acme = outputDir.resolve("Acme_Insurance.csv");
+        Files.writeString(acme, "Old content\n");
+
+        String csv = """
+            User Id,Full Name,Version,Insurance Company
+            1,Jane Doe,1,Acme Insurance
+            """;
+        Files.writeString(inputCsv, csv);
+        runMainWithInput(inputCsv);
+
+        String content = Files.readString(acme);
+        assertFalse(content.contains("Old content"), "Old output should be replaced, not appended");
+    }
 }
