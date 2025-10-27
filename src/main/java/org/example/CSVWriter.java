@@ -1,6 +1,7 @@
 package org.example;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -65,6 +66,7 @@ public class CSVWriter {
                 Files.writeString(
                         filePath,
                         lines.collect(Collectors.joining(System.lineSeparator())),
+                        StandardCharsets.UTF_8,
                         StandardOpenOption.CREATE,
                         StandardOpenOption.TRUNCATE_EXISTING
                 );

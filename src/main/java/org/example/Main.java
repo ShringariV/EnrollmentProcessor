@@ -7,7 +7,6 @@ import java.util.Map;
 public class Main {
     public static void main(String[] args) {
         System.out.println("=== Enrollment File Processor ===");
-        while(true) {
             try {
                 // Read file path from stdin
                 java.util.Scanner scanner = new java.util.Scanner(System.in);
@@ -32,4 +31,3 @@ public class Main {
             }
         }
     }
-}
